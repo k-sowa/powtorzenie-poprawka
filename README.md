@@ -1,6 +1,5 @@
-# powtorzenie-poprawka
 
-
+## Bazy danych
 <details>
 
 <summary>Tworzenie bazy danych w kodzie oraz używanie tej bazy danych w innych klasach</summary>
