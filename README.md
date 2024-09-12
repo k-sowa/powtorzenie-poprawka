@@ -1,13 +1,14 @@
 
 ## Ważne informacje
 
+# Czas
 Czas najlepiej przechowywać za pomocą LocalDateTime
 
 Możemy go formatować np za pmocą formattera
 ```java
 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 ```
-
+# Parametry
 Jeśli chcemy przekazać parametry do @PostMapping w Springu musimy utworzyć osobną klase ponieważ @BodyRequest przyjmuje tylko jeden parametr np.
 ```java
 @PostMapping("/pixel")
@@ -21,6 +22,8 @@ Jeśli chcemy przekazać parametry do @PostMapping w Springu musimy utworzyć os
         return ResponseEntity.ok().build();
     }
 ```
+
+
 <details>
   <summary>Struktura PixelRequest</summary>
   
@@ -66,6 +69,46 @@ Jeśli chcemy przekazać parametry do @PostMapping w Springu musimy utworzyć os
 ```
 </details>
 
+# Kody błędów lub sukcesu
+Kody przekazujemy za pmmocą ResponseEntity
+kody które możemy zwrócić wyglądają następująco
+<details>
+    <summary> Kody </summary>
+    
+<ul>
+    <li>200 OK: Żądanie zostało pomyślnie przetworzone.</li>
+    <li>201 Created: Zasób został pomyślnie utworzony.</li>
+    <li>204 No Content: Żądanie zostało pomyślnie przetworzone, ale nie ma treści do zwrócenia.</li>
+    <li>400 Bad Request: Żądanie jest niepoprawne lub niekompletne.</li>
+    <li>401 Unauthorized: Brak autoryzacji do wykonania żądania.</li>
+    <li>403 Forbidden: Brak dostępu do zasobu.</li>
+    <li>404 Not Found: Żądany zasób nie został znaleziony.</li>
+    <li>500 Internal Server Error: Wystąpił błąd na serwerze.</li>
+    <li>302 Found: Przekierowanie do innego URL.</li>
+</ul>
+    
+</details>
+Przykład
+
+```java
+@RestController
+public class ExampleController {
+
+    @GetMapping("/validate")
+    public ResponseEntity<String> validate(@RequestParam String data) {
+        if (data == null || data.isEmpty()) {
+            return new ResponseEntity<>("Invalid data provided", HttpStatus.BAD_REQUEST); // Kod statusu 400
+        }
+        // Logic for valid data
+        return new ResponseEntity<>("Data is valid", HttpStatus.OK); // Kod statusu 200
+    }
+}
+```
+
+Jeśli w ResponseEntity damy void np. ResponseEntity<Void> to możemy zwrócic sam kod błędu np:
+```java
+return ResponseEntity.ok().build();
+```
 ## Bazy danych
 <details>
 
