@@ -294,7 +294,7 @@ public class ImageController {
 ## Połączenie serwer-klient
 <details>
 
-<summary>Utworzenie serwera na przykładzie zadania o umieszczanie pixeli na obrazie a potem utworzenie klienta</summary>
+<summary>Utworzenie serwera do którego może się podłączyć tylko jeden użytkownik na przykładzie zadania o umieszczanie pixeli na obrazie a potem utworzenie klienta</summary>
 
 ```java
 
