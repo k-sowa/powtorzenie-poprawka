@@ -1,4 +1,71 @@
 
+## Ważne informacje
+
+Czas najlepiej przechowywać za pomocą LocalDateTime
+
+Możemy go formatować np za pmocą formattera
+```java
+LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+```
+
+Jeśli chcemy przekazać parametry do @PostMapping w Springu musimy utworzyć osobną klase ponieważ @BodyRequest przyjmuje tylko jeden parametr np.
+```java
+@PostMapping("/pixel")
+    public ResponseEntity<Void> putPixel(@RequestBody PixelRequest pixelRequest){
+        String colorHex = pixelRequest.getColor().trim();
+        int rgb = Integer.parseInt(colorHex, 16);
+        image.setRGB(pixelRequest.getX(), pixelRequest.getY(),rgb);
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        //Wywolanie zapytania do bazy danych za pomocą wcześniej utworzonej metody insertEntry
+        databaseManager.insertEntry(pixelRequest.getUuid().toString(), pixelRequest.getX(), pixelRequest.getY(), pixelRequest.getColor(), timestamp);
+        return ResponseEntity.ok().build();
+    }
+```
+<details>
+  <summary>Struktura PixelRequest</summary>
+  
+  ```java
+  public class PixelRequest {
+    private UUID uuid;
+    private int x;
+    private int y;
+    private String color;
+
+    public UUID getUuid() {
+        return uuid;
+    }
+
+    public void setUuid(UUID uuid) {
+        this.uuid = uuid;
+    }
+
+    public int getX() {
+        return x;
+    }
+
+    public void setX(int x) {
+        this.x = x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public void setY(int y) {
+        this.y = y;
+    }
+
+    public String getColor() {
+        return color;
+    }
+
+    public void setColor(String color) {
+        this.color = color;
+    }
+}
+```
+</details>
+
 ## Bazy danych
 <details>
 
@@ -422,6 +489,36 @@ public class Main {
     }
 }
 
+```
+  
+</details>
+
+## Tworzenie obrazu na stronie w Springu
+<details>
+  <summary>Proste utworzenie czarnego obrazu a potem wywołanie go na podstronie</summary>
+
+```java
+private static final int WIDTH = 512;
+    private static final int HEIGHT = 512;
+
+    private final BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+    //Inicjalizacja bazy danych
+    private final DatabaseManager databaseManager;
+    private final UserController userController;
+    public ImageController(DatabaseManager databaseManager, UserController userController) {
+        this.databaseManager = databaseManager;
+        this.userController = userController;
+        Graphics2D graphics = image.createGraphics();
+        graphics.setColor(Color.black);
+        graphics.fillRect(0, 0, WIDTH, HEIGHT);
+        graphics.dispose();
+    }
+
+    @GetMapping("/image")
+    public void getImage(HttpServletResponse response) throws IOException {
+        response.setContentType("image/jpeg");
+        ImageIO.write(image,"jpeg",response.getOutputStream());
+    }
 ```
   
 </details>
