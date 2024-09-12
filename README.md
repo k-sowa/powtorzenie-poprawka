@@ -937,3 +937,162 @@ public class HelloController {
 }
 ```
 </details>
+
+## Niedziałający program z javafx ale kod może się przydać w celu tworzenia okienka w kodzie
+
+<details>
+    <summary>kod</summary>
+
+```java
+    public class ImageServer {
+
+    private static final int PORT = 12345; // Port na którym serwer będzie nasłuchiwał
+    private static final String IMAGE_DIR = "images"; // Katalog na obrazy
+    private static final String DB_FILE = IMAGE_DIR + "/index.db"; // Ścieżka do pliku bazy danych
+    private static int filterSize = 3;  // Rozmiar filtra (domyślnie 3)
+
+    public static void main(String[] args) {
+        createImageDirectory(); // Tworzy katalog na obrazy, jeśli nie istnieje
+        setupDatabase(); // Inicjalizuje bazę danych
+        startServer(); // Rozpoczyna działanie serwera
+    }
+
+    private static void createImageDirectory() {
+        File dir = new File(IMAGE_DIR); // Tworzy obiekt File dla katalogu
+        if (!dir.exists()) { // Sprawdza, czy katalog istnieje
+            dir.mkdirs(); // Tworzy katalog, jeśli nie istnieje
+        }
+    }
+
+    private static void setupDatabase() {
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + DB_FILE)) { // Nawiązuje połączenie z bazą danych SQLite
+            Statement stmt = conn.createStatement(); // Tworzy obiekt Statement do wykonywania zapytań
+            String createTableSQL = "CREATE TABLE IF NOT EXISTS images (" + // SQL do tworzenia tabeli, jeśli nie istnieje
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," + // Kolumna id jako klucz główny z autoinkrementacją
+                    "path TEXT NOT NULL," + // Kolumna path (ścieżka do pliku) jako tekst, nie może być NULL
+                    "size INTEGER NOT NULL," + // Kolumna size (rozmiar filtra) jako integer, nie może być NULL
+                    "delay INTEGER NOT NULL);"; // Kolumna delay (czas działania algorytmu) jako integer, nie może być NULL
+            stmt.execute(createTableSQL); // Wykonuje zapytanie SQL do utworzenia tabeli
+        } catch (SQLException e) { // Obsługuje wyjątek SQL
+            e.printStackTrace(); // Wypisuje stos śladu błędu
+        }
+    }
+
+    private static void startServer() {
+        ExecutorService executor = Executors.newSingleThreadExecutor(); // Tworzy ExecutorService do obsługi wątków (jednowątkowo)
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) { // Tworzy obiekt ServerSocket do nasłuchiwania połączeń na porcie
+            System.out.println("Server started on port " + PORT); // Wypisuje informację o uruchomieniu serwera
+            while (true) { // Pętla nieskończona do obsługi połączeń
+                Socket clientSocket = serverSocket.accept(); // Akceptuje połączenie klienta
+                executor.submit(() -> handleClient(clientSocket)); // Wysyła połączenie do obsługi w osobnym wątku
+            }
+        } catch (IOException e) { // Obsługuje wyjątek wejścia/wyjścia
+            e.printStackTrace(); // Wypisuje stos śladu błędu
+        }
+    }
+
+    private static void handleClient(Socket clientSocket) {
+        try (InputStream input = clientSocket.getInputStream(); // Otwiera strumień wejściowy z klienta
+             OutputStream output = clientSocket.getOutputStream()) { // Otwiera strumień wyjściowy do klienta
+
+            // 1. Receive and save PNG file
+            String fileName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".png"; // Generuje nazwę pliku z aktualnym znakiem czasowym
+            File file = new File(IMAGE_DIR, fileName); // Tworzy obiekt File dla nowego pliku
+            try (FileOutputStream fos = new FileOutputStream(file)) { // Otwiera strumień wyjściowy do zapisu pliku
+                byte[] buffer = new byte[4096]; // Bufor do przechwytywania danych
+                int bytesRead;
+                while ((bytesRead = input.read(buffer)) != -1) { // Odczytuje dane od klienta
+                    fos.write(buffer, 0, bytesRead); // Zapisuje dane do pliku
+                }
+            }
+            
+            filterSize = showFilterSizeUI(); // Wyświetla UI do wyboru rozmiaru filtra
+            
+            BufferedImage image = ImageIO.read(file); // Odczytuje obraz z pliku
+            long startTime = System.currentTimeMillis(); // Zapisuje czas rozpoczęcia
+            BufferedImage blurredImage = applyBoxBlur(image, filterSize); // Zastosowuje filtr box blur
+            long endTime = System.currentTimeMillis(); // Zapisuje czas zakończenia
+            long delay = endTime - startTime; // Oblicza czas działania algorytmu
+            
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + DB_FILE)) { // Nawiązuje połączenie z bazą danych SQLite
+                String insertSQL = "INSERT INTO images (path, size, delay) VALUES (?, ?, ?)"; // SQL do wstawienia danych
+                try (PreparedStatement pstmt = conn.prepareStatement(insertSQL)) { // Przygotowuje zapytanie do bazy danych
+                    pstmt.setString(1, file.getAbsolutePath()); // Ustawia ścieżkę pliku
+                    pstmt.setInt(2, filterSize); // Ustawia rozmiar filtra
+                    pstmt.setLong(3, delay); // Ustawia czas działania algorytmu
+                    pstmt.executeUpdate(); // Wykonuje zapytanie
+                }
+            }
+            
+            ImageIO.write(blurredImage, "png", output); // Zapisuje przetworzony obraz do strumienia wyjściowego
+
+        } catch (IOException | SQLException e) { // Obsługuje wyjątki wejścia/wyjścia i SQL
+            e.printStackTrace(); // Wypisuje stos śladu błędu
+        }
+    }
+
+    private static BufferedImage applyBoxBlur(BufferedImage image, int size) {
+        // Box blur implementation
+        int radius = size / 2; // Oblicza promień filtra
+        int width = image.getWidth(); // Pobiera szerokość obrazu
+        int height = image.getHeight(); // Pobiera wysokość obrazu
+        BufferedImage blurredImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB); // Tworzy nowy obraz dla przetworzonego obrazu
+        for (int x = 0; x < width; x++) { // Iteruje przez szerokość obrazu
+            for (int y = 0; y < height; y++) { // Iteruje przez wysokość obrazu
+                int r = 0, g = 0, b = 0, count = 0; // Inicjalizuje zmienne do obliczenia średnich wartości RGB
+                for (int dx = -radius; dx <= radius; dx++) { // Iteruje przez sąsiednie piksele w poziomie
+                    for (int dy = -radius; dy <= radius; dy++) { // Iteruje przez sąsiednie piksele w pionie
+                        int nx = x + dx; // Oblicza współrzędne sąsiada w poziomie
+                        int ny = y + dy; // Oblicza współrzędne sąsiada w pionie
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) { // Sprawdza, czy sąsiad mieści się w granicach obrazu
+                            Color color = new Color(image.getRGB(nx, ny)); // Pobiera kolor piksela sąsiada
+                            r += color.getRed(); // Dodaje wartość czerwieni
+                            g += color.getGreen(); // Dodaje wartość zieleni
+                            b += color.getBlue(); // Dodaje wartość niebieskiego
+                            count++; // Inkrementuje licznik
+                        }
+                    }
+                }
+                Color avgColor = new Color(r / count, g / count, b / count); // Oblicza średni kolor
+                blurredImage.setRGB(x, y, avgColor.getRGB()); // Ustawia średni kolor w przetworzonym obrazie
+            }
+        }
+        return blurredImage; // Zwraca przetworzony obraz
+    }
+
+    private static int showFilterSizeUI() {
+        final int[] selectedSize = {3}; // Tablica do przechowywania wybranego rozmiaru filtra
+
+        Application.launch(FilterSizeApp.class, (String[]) null); // Uruchamia aplikację JavaFX do wyboru rozmiaru filtra
+
+        return filterSize; // Zwraca wybrany rozmiar filtra
+    }
+
+    public static class FilterSizeApp extends Application {
+        @Override
+        public void start(Stage primaryStage) {
+            primaryStage.setTitle("Select Filter Size"); // Ustawia tytuł okna
+
+            Slider slider = new Slider(1, 15, 3); // Tworzy suwak do wyboru rozmiaru filtra (zakres 1-15, domyślnie 3)
+            slider.setMajorTickUnit(2); // Ustawia jednostki dużych kroków suwaka
+            slider.setShowTickLabels(true); // Pokazuje etykiety przy dużych krokach
+            slider.setShowTickMarks(true); // Pokazuje oznaczenia suwaka
+
+            Label label = new Label("Filter Size: " + (int) slider.getValue()); // Etykieta pokazująca rozmiar filtra
+            slider.valueProperty().addListener((obs, oldVal, newVal) -> label.setText("Filter Size: " + newVal.intValue())); // Aktualizuje etykietę, gdy zmienia się wartość suwaka
+
+            Button submitButton = new Button("Submit"); // Tworzy przycisk do zatwierdzania wyboru
+            submitButton.setOnAction(e -> {
+                filterSize = (int) slider.getValue(); // Ustawia wybrany rozmiar filtra
+                primaryStage.close(); // Zamknięcie okna
+            });
+
+            VBox vbox = new VBox(10, slider, label, submitButton); // Tworzy kontener dla elementów GUI
+            Scene scene = new Scene(vbox, 300, 200); // Tworzy scenę z kontenerem
+            primaryStage.setScene(scene); // Ustawia scenę w oknie
+            primaryStage.showAndWait(); // Wyświetla okno i czeka na jego zamknięcie
+        }
+    }
+}
+```   
+</details>
