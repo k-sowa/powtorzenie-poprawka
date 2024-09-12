@@ -109,6 +109,26 @@ Jeśli w ResponseEntity damy void np. ResponseEntity<Void> to możemy zwrócic s
 ```java
 return ResponseEntity.ok().build();
 ```
+
+Tworzenie metody która się automatycznie wywołuje po starcie serwera
+```java
+@Component
+public class ImageInitializer implements CommandLineRunner {
+
+    private final ImageController imageController;
+
+    public ImageInitializer(ImageController imageController) {
+        this.imageController = imageController;
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        imageController.generateImage();
+    }
+}
+
+```
+W tym wypadku wywołujemy metode generateImage() z klasy imageController.
 ## Bazy danych
 <details>
 
